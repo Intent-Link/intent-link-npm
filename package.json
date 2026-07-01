@@ -1,0 +1,32 @@
+{
+  "name": "@intent-link/react",
+  "version": "1.0.1",
+  "description": "Thermodynamic intent prediction for Next.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "keywords": [
+    "nextjs",
+    "react",
+    "prefetch",
+    "performance",
+    "intent",
+    "target prediction"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3"
+  },
+  "peerDependencies": {
+    "next": ">=13.0.0",
+    "react": ">=18.0.0"
+  }
+}
