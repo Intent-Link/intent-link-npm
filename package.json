@@ -1,6 +1,6 @@
 {
   "name": "intent-link",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "User target prediction library",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -27,6 +27,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Intent-Link/intent-link-npm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Intent-Link/intent-link-npm/issues"
+  },
+  "homepage": "https://github.com/Intent-Link/intent-link-npm#readme",
   "devDependencies": {
     "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
