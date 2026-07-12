@@ -65,7 +65,7 @@ export class KalmanFilter2D {
     init(x: number, y: number, timestamp: number) {
         this.x = [[x], [y], [0], [0]];
         this.lastTime = timestamp;
-        return { x, y, vx: 0, vy: 0, v: 0, sigmaV: 0.0001 };
+        return { x, y, vx: 0, vy: 0, v: 0, velocityVariance: 0 };
     }
 
     update(measX: number, measY: number, timestamp: number) {
@@ -75,8 +75,8 @@ export class KalmanFilter2D {
         if (dt <= 0) {
             const estVx = this.x[2][0];
             const estVy = this.x[3][0];
-            const sigmaV = Math.sqrt(this.P[2][2] + this.P[3][3]);
-            return { x: this.x[0][0], y: this.x[1][0], vx: estVx, vy: estVy, v: Math.sqrt(estVx * estVx + estVy * estVy), sigmaV };
+            const velocityVariance = this.P[2][2] + this.P[3][3];
+            return { x: this.x[0][0], y: this.x[1][0], vx: estVx, vy: estVy, v: Math.sqrt(estVx * estVx + estVy * estVy), velocityVariance };
         }
 
         const F = [[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]];
@@ -98,9 +98,9 @@ export class KalmanFilter2D {
 
         const estVx = this.x[2][0];
         const estVy = this.x[3][0];
-        const sigmaV = Math.sqrt(this.P[2][2] + this.P[3][3]);
+        const velocityVariance = this.P[2][2] + this.P[3][3];
 
-        return { x: this.x[0][0], y: this.x[1][0], vx: estVx, vy: estVy, v: Math.sqrt(estVx * estVx + estVy * estVy), sigmaV };
+        return { x: this.x[0][0], y: this.x[1][0], vx: estVx, vy: estVy, v: Math.sqrt(estVx * estVx + estVy * estVy), velocityVariance };
     }
 }
 
