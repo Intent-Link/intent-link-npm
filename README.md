@@ -4,6 +4,8 @@
 
 `intent-link` watches real user behavior using kinetic and potential energy and calls `onIntent` when the user is predicted to interact with a target.
 
+[Website](https://intentlink.dev/en) · [Support Intent Link on Patreon](https://www.patreon.com/c/IntentLink)
+
 ## Consumer architecture
 
 The primary library experience consists of two components:
@@ -338,6 +340,10 @@ import type { IntentLinkProps, UseIntentTargetOptions } from "intent-link";
 ## License
 
 MIT
+
+## Support the project
+
+`intent-link` is free and open source. If it is useful to you, you can support its continued development on [Patreon](https://www.patreon.com/c/IntentLink).
 
 ## Contributors
 

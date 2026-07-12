@@ -1,6 +1,6 @@
 {
   "name": "intent-link",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "User target prediction library",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -45,7 +45,11 @@
   "bugs": {
     "url": "https://github.com/Intent-Link/intent-link-npm/issues"
   },
-  "homepage": "https://github.com/Intent-Link/intent-link-npm#readme",
+  "homepage": "https://intentlink.dev/en",
+  "funding": {
+    "type": "patreon",
+    "url": "https://www.patreon.com/c/IntentLink"
+  },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@testing-library/react": "^16.3.2",
