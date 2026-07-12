@@ -156,4 +156,5 @@ export class KalmanFilter1D {
     getVelocityVariance(): number {
         return this.P[1][1];
     }
+
 }

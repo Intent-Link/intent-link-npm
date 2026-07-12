@@ -193,7 +193,8 @@ export class IntentEngine {
                 / (2 * velocityVariance);
             const targetExponent = -(targetVelocity * targetVelocity)
                 / (2 * velocityVariance);
-            const potentialExponent = -(piE * distance * distance) / (width * width);
+            const potentialExponent = -(piE * distance * distance)
+                / (width * width);
             const unnormalizedProbability = Math.exp(agentExponent + targetExponent + potentialExponent);
 
             calculated.push({ target, unnormalizedProbability });
