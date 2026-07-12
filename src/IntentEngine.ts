@@ -3,6 +3,7 @@ import { isVisibleIntentTarget } from './visibility';
 import type { IntentLevel } from './useIntentTarget';
 
 const SETTLE_TIME_MS = 500;
+const MIN_VELOCITY_VARIANCE = 1e-8;
 const IMPORTANCE_WEIGHTS = { high: 1, medium: 0.5, low: 0.2 } as const;
 const COST_WEIGHTS = { high: 0.8, medium: 0.4, low: 0.1 } as const;
 
@@ -161,15 +162,15 @@ export class IntentEngine {
 
         let agentVelocity = 0;
         let targetVelocity = 0;
-        let velocityDeviation = 0.0001;
+        let velocityVariance = MIN_VELOCITY_VARIANCE;
 
         if (!isMobile) {
             const estimate = this.kalman2D.update(this.cursor.x, this.cursor.y, timestamp);
             agentVelocity = estimate.v;
-            velocityDeviation += estimate.sigmaV;
+            velocityVariance = Math.max(estimate.velocityVariance, MIN_VELOCITY_VARIANCE);
         } else {
             targetVelocity = Math.abs(this.kalman1D.update(this.scroll.y, timestamp));
-            velocityDeviation += Math.sqrt(Math.max(this.kalman1D.getVelocityVariance(), 0));
+            velocityVariance = Math.max(this.kalman1D.getVelocityVariance(), MIN_VELOCITY_VARIANCE);
         }
 
         const calculated: CalculatedTarget[] = [];
@@ -187,12 +188,13 @@ export class IntentEngine {
             const dx = isMobile ? 0 : originX - centerX;
             const dy = originY - centerY;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const width = Math.min(rect.width, rect.height, 1);
+            const width = Math.max(rect.width, rect.height, 1);
             const agentExponent = -(agentVelocity * agentVelocity)
-                / (2 * velocityDeviation * velocityDeviation);
+                / (2 * velocityVariance);
             const targetExponent = -(targetVelocity * targetVelocity)
-                / (2 * velocityDeviation * velocityDeviation);
-            const potentialExponent = -(piE * distance * distance) / (width * width);
+                / (2 * velocityVariance);
+            const potentialExponent = -(piE * distance * distance)
+                / (width * width);
             const unnormalizedProbability = Math.exp(agentExponent + targetExponent + potentialExponent);
 
             calculated.push({ target, unnormalizedProbability });
