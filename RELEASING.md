@@ -1,6 +1,6 @@
 # Releasing intent-link
 
-This guide is for the package maintainers. Publishing uses npm trusted publishing through GitHub Actions and OIDC, so no long-lived `NPM_TOKEN` is required.
+This guide is for the package maintainers. The repository uses a `dev` branch for development and a `main` branch for releases. Publishing uses npm trusted publishing through GitHub Actions and OIDC, so no long-lived `NPM_TOKEN` is required.
 
 ## 1. Choose and set the version
 
@@ -16,7 +16,7 @@ Update `package.json` and `package-lock.json` together. For a patch release:
 npm version patch --no-git-tag-version
 ```
 
-Alternatively, replace `patch` with `minor` or `major`. Do not manually create a Git tag yet.
+Alternatively, replace `patch` with `minor` or `major`. Manual Git tags are not required; merging a new version into `main` triggers publishing.
 
 Add the release notes to the matching version section in `CHANGELOG.md`.
 
@@ -54,7 +54,7 @@ Avoid `--force` unless npm reports a peer-dependency conflict that has been inve
 
 The generated `.tgz` file is ignored by Git and excluded from npm packages.
 
-## 4. Commit and push the release
+## 4. Push the release candidate to `dev`
 
 Return to the library repository and review the changes:
 
@@ -63,36 +63,29 @@ git status
 git diff
 ```
 
-Commit and push the version, changelog, and code changes:
+Commit and push the version, changelog, and code changes to `dev`:
 
 ```bash
 git add .
 git commit -m "Release v<version>"
-git push origin main
+git push origin dev
 ```
 
-Replace `main` if the repository's default branch has a different name.
+Pushing to `dev` starts `.github/workflows/publish.yml`. It installs dependencies, runs the complete test and browser suite, builds the package, and inspects the package contents. It does not publish from `dev`.
 
-## 5. Trigger npm publishing
+## 5. Merge `dev` into `main`
 
-Create a tag that exactly matches the version in `package.json`, then push it:
+After the `dev` workflow succeeds, open and merge a pull request from `dev` into `main`.
 
-```bash
-git tag v<version>
-git push origin v<version>
-```
+The merge creates a push to `main`, which runs the same workflow again. The workflow:
 
-For example, package version `1.0.10` requires tag `v1.0.10`.
+1. Installs dependencies and Chromium.
+2. Runs the complete test and build suite.
+3. Inspects the npm package contents.
+4. Checks whether the version already exists on npm.
+5. Publishes a new version through npm trusted publishing.
 
-Pushing the tag starts `.github/workflows/publish.yml`. The workflow:
-
-1. Verifies that the tag matches `package.json`.
-2. Installs dependencies and Chromium.
-3. Runs the complete test and build suite.
-4. Inspects the npm package contents.
-5. Publishes through npm trusted publishing.
-
-If the tag and package version differ, publishing stops. A version already published to npm cannot be reused.
+Every intended release must have a version that has not previously been published. If the version already exists, the workflow safely skips publishing instead of failing.
 
 ## 6. Confirm the release
 
@@ -115,15 +108,16 @@ npm pack
 
 # Test the archive in the local application before continuing
 
-# Back in the library repository
+# Back in the library repository on dev
 git status
 git diff
 git add .
 git commit -m "Release v<version>"
-git push origin main
-git tag v<version>
-git push origin v<version>
+git push origin dev
 
-# After GitHub Actions succeeds
+# After the dev workflow succeeds, merge the dev → main pull request.
+# The main workflow tests and publishes the new version automatically.
+
+# After the main workflow succeeds
 npm view intent-link version
 ```
