@@ -2,7 +2,18 @@
 
 **A target prediction library for React/Next.js.**
 
-`intent-link` watches real user behavior using kinetic and potential energy — and estimates, in real time, the *probability* that the user is about to interact with a given element. It exposes that probability through a simple `onIntent` callback that fires once a link crosses a configurable confidence threshold.
+`intent-link` watches real user behavior using kinetic and potential energy and calls `onIntent` when the user is predicted to interact with a target.
+
+## Consumer architecture
+
+The primary library experience consists of two components:
+
+1. `IntentProvider` runs one prediction engine for the application. Add it once to your root layout.
+2. `IntentLink` is the prebuilt Next.js link. Use it anywhere below the provider when you want to react to predicted intent.
+
+The quick start below shows each component in its natural location: `IntentProvider` in `layout.tsx`, followed by an `IntentLink` inside an application component.
+
+For non-link elements and third-party components, the advanced `useIntentTarget` hook returns a ref that connects one HTML element to the same prediction engine.
 
 What you do with that signal is up to you. Prefetching a route is one obvious use case, but predicting user intent has plenty of others:
 
@@ -29,11 +40,20 @@ yarn add intent-link
 pnpm add intent-link
 ```
 
-**Peer dependencies:** `react >= 18`, `react-dom >= 18`, `next >= 13`.
+## Compatibility
+
+| Dependency | Supported range | Continuously tested |
+|---|---|---|
+| React | `18.x` and `19.x` | React 19 |
+| React DOM | `18.x` and `19.x` | React DOM 19 |
+| Next.js | `13.x` through `16.x` | Next.js 16 |
+| Node.js | Current Next.js requirement | Node.js 20 and 22 in CI |
+
+The package is a client-side integration and supports both the Next.js App Router and Pages Router wherever `next/link` and client components are available.
 
 ## Quick start
 
-Wrap your app once with `IntentProvider` — this runs the prediction engine and computes intent probabilities for every registered target:
+Wrap your app once with `IntentProvider`. It runs the shared prediction engine for all registered targets below it:
 
 ```jsx
 // app/layout.js
@@ -69,7 +89,7 @@ function ProductCard({ href }) {
 }
 ```
 
-`onIntent` fires once, the first time predicted intent for that link crosses its utility threshold — not on every mouse move.
+`onIntent` fires once when the model's action criterion is met—not on every mouse move.
 
 ### Use case: something other than prefetching
 
@@ -89,25 +109,19 @@ Or logging predicted-but-unclicked targets for analytics:
 ```jsx
 <IntentLink
   href="/upgrade"
-  onIntent={({ href, utility }) => track("predicted_intent", { href, utility })}
+  onIntent={() => track("predicted_intent", { href: "/upgrade" })}
 >
   Upgrade
 </IntentLink>
 ```
 
-If you want target prediction without `next/link`'s routing behavior at all — e.g. to drive a hover-preview on a non-navigational element — use `IntentContext` directly (see [Building your own target-aware components](#building-your-own-target-aware-components) below).
-
-## Why not just prefetch/observe everything?
-
-Naively prefetching (or reacting to) every visible link is wasteful on link-heavy pages — nav bars, product grids, footers — and doesn't distinguish "the user glanced past this" from "the user is moving toward this." `intent-link` runs a Kalman filter over cursor position (desktop) or scroll position (mobile) to estimate velocity and trajectory in real time, then combines that with each target's on-screen position and size to compute a probability that it's what the user is actually heading toward. You decide what to do with that probability once it crosses your threshold.
-
-`IntentLink` sets `prefetch={false}` on the underlying `next/link` by default, since prefetching is treated as just one possible consumer of the signal, not something forced on you.
+If you want target prediction without `next/link`'s routing behavior at all—such as a preview on a button or card—use `useIntentTarget`.
 
 ## API
 
 ### `<IntentProvider>`
 
-Context provider that runs the prediction engine. Mount it once, near the root of your app (typically in `layout.js`/`layout.tsx`). Everything inside it can use `IntentLink` or read from `IntentContext` directly.
+Context provider that runs the prediction engine. Mount it once, near the root of your app (typically in `layout.js`/`layout.tsx`). Everything inside it can use `IntentLink` or `useIntentTarget`.
 
 ```jsx
 <IntentProvider>{children}</IntentProvider>
@@ -124,7 +138,7 @@ A target-prediction-aware drop-in replacement for `next/link`. Accepts everythin
 | `href` | `string \| UrlObject` | — | Same as `next/link`. Required. |
 | `importance` | `"high" \| "medium" \| "low"` | `"medium"` | How readily predicted intent alone should trigger `onIntent` for this target. Higher importance triggers sooner. |
 | `cost` | `"high" \| "medium" \| "low"` | `"low"` | The cost of acting on a false positive. Raise this if whatever `onIntent` does is expensive (an API call, a websocket) rather than cheap (a `router.prefetch`). |
-| `onIntent` | `(data: { href: string; utility: number }) => void` | — | Called once when predicted intent crosses the utility threshold for this target. What it does is entirely up to you — prefetch, preview, log, animate, anything. Resets and can fire again if probability drops and rises again. |
+| `onIntent` | `() => void` | — | Called once when the model decides that acting on predicted intent is worthwhile. Resets after the user moves away and can fire again on a later approach. |
 | `...rest` | — | — | Any other `next/link` or anchor prop — `className`, `style`, `target`, `ref`, etc. |
 
 ```jsx
@@ -133,10 +147,7 @@ A target-prediction-aware drop-in replacement for `next/link`. Accepts everythin
   importance="high"
   cost="high"
   className="btn btn-primary"
-  onIntent={({ href, utility }) => {
-    console.log(`High confidence (${utility.toFixed(2)}) user wants ${href}`);
-    router.prefetch(href);
-  }}
+  onIntent={() => router.prefetch("/checkout")}
 >
   Checkout
 </IntentLink>
@@ -144,44 +155,173 @@ A target-prediction-aware drop-in replacement for `next/link`. Accepts everythin
 
 ## How `importance` and `cost` interact
 
-Internally, each target's "should I fire `onIntent`" decision is:
+Raise `importance` when the target deserves earlier action, such as a prominent call to action. Raise `cost` when an incorrect trigger would be expensive or disruptive. The library keeps the underlying decision calculation private and calls `onIntent` only when its action criterion is met.
 
-```
-utility = (probability × importanceWeight) − costWeight
-```
+Suggested starting points:
 
-`onIntent` fires the first time `utility` exceeds `0`. Raise `importance` for targets you're confident about acting on early (a prominent Call to Action). Raise `cost` for targets where firing `onIntent` unnecessarily is expensive or disruptive, regardless of what that callback actually does.
+| Action | Importance | Cost |
+|---|---|---|
+| Route or image prefetch | `medium` | `low` |
+| Passive preview or highlight | `medium` | `low` |
+| API request | `medium` | `medium` |
+| Expensive session or connection warmup | `high` | `high` |
 
-## Building your own target-aware components
+These are product-level controls, not confidence scores. Start with the defaults and raise `cost` when a false trigger would consume meaningful resources.
 
-If `IntentLink`'s `next/link` behavior doesn't fit your use case — say, you want target prediction on a `<button>`, a card, or any arbitrary element — you can consume `IntentContext` directly and register elements yourself:
+## Custom targets
 
-```jsx
-import { useContext, useRef, useEffect, useId } from "react";
-import { IntentContext } from "intent-link";
+`IntentLink` is the recommended prebuilt component for navigation. When the target is not a Next.js link, use `useIntentTarget`. It returns a ref; attach that ref to the HTML element whose intent you want to observe.
 
-function PredictiveButton({ onIntent, children }) {
-  const { probabilities, registerLink, unregisterLink } = useContext(IntentContext);
-  const ref = useRef(null);
-  const id = useId();
+### Basic ref example
 
-  useEffect(() => {
-    if (!ref.current) return;
-    registerLink(id, ref.current);
-    return () => unregisterLink(id);
-  }, [id, registerLink, unregisterLink]);
+```tsx
+"use client";
 
-  const probability = probabilities[id]?.probability ?? 0;
+import { useIntentTarget } from "intent-link";
 
-  useEffect(() => {
-    if (probability > 0.5) onIntent?.();
-  }, [probability, onIntent]);
+export function PreviewButton() {
+  const intentRef = useIntentTarget<HTMLButtonElement>({
+    onIntent: () => preloadProductPreview(),
+  });
 
-  return <button ref={ref}>{children}</button>;
+  return (
+    <button ref={intentRef}>
+      Preview product
+    </button>
+  );
 }
 ```
 
-`probabilities[id]` gives you the raw `PhysicsState` for that element (`probability`, `weight`, `kineticAgent`, `kineticTarget`, `potential`) if you want finer control than `IntentLink`'s built-in `importance`/`cost` model.
+Registration, model state, decision-making, one-shot triggering, resetting, and cleanup remain internal.
+
+### Building a reusable `IntentButton`
+
+If an application contains many predictive buttons, wrap the hook once and reuse the resulting component:
+
+```tsx
+"use client";
+
+import type { ButtonHTMLAttributes } from "react";
+import {
+  useIntentTarget,
+  type UseIntentTargetOptions,
+} from "intent-link";
+
+type IntentButtonProps =
+  ButtonHTMLAttributes<HTMLButtonElement> &
+  UseIntentTargetOptions;
+
+export function IntentButton({
+  onIntent,
+  importance,
+  cost,
+  children,
+  ...buttonProps
+}: IntentButtonProps) {
+  const intentRef = useIntentTarget<HTMLButtonElement>({
+    onIntent,
+    importance,
+    cost,
+  });
+
+  return (
+    <button ref={intentRef} {...buttonProps}>
+      {children}
+    </button>
+  );
+}
+```
+
+Usage:
+
+```tsx
+<IntentButton
+  className="preview-button"
+  onIntent={preloadPreview}
+>
+  Preview
+</IntentButton>
+```
+
+### Building a reusable `IntentArticle`
+
+The same pattern works for cards and other semantic containers:
+
+```tsx
+"use client";
+
+import type { HTMLAttributes } from "react";
+import {
+  useIntentTarget,
+  type UseIntentTargetOptions,
+} from "intent-link";
+
+type IntentArticleProps =
+  HTMLAttributes<HTMLElement> &
+  UseIntentTargetOptions;
+
+export function IntentArticle({
+  onIntent,
+  importance,
+  cost,
+  children,
+  ...articleProps
+}: IntentArticleProps) {
+  const intentRef = useIntentTarget<HTMLElement>({
+    onIntent,
+    importance,
+    cost,
+  });
+
+  return (
+    <article ref={intentRef} {...articleProps}>
+      {children}
+    </article>
+  );
+}
+```
+
+Usage:
+
+```tsx
+<IntentArticle
+  className="product-card"
+  onIntent={() => preloadProduct(productId)}
+>
+  <ProductImage />
+  <ProductDetails />
+</IntentArticle>
+```
+
+### Third-party components
+
+If a third-party component forwards its ref to a real HTML element, attach the intent ref directly:
+
+```tsx
+const intentRef = useIntentTarget<HTMLDivElement>({
+  onIntent: prepareCarousel,
+});
+
+return (
+  <ThirdPartyCarousel ref={intentRef}>
+    {slides}
+  </ThirdPartyCarousel>
+);
+```
+
+If the third-party component does not forward its ref, wrap it in a native element and observe that wrapper:
+
+```tsx
+const intentRef = useIntentTarget<HTMLDivElement>({
+  onIntent: prepareCarousel,
+});
+
+return (
+  <div ref={intentRef}>
+    <ThirdPartyCarousel>{slides}</ThirdPartyCarousel>
+  </div>
+);
+```
 
 ## Mobile behavior
 
@@ -192,9 +332,15 @@ On touch devices there's no cursor to track, so `intent-link` falls back to trac
 Fully typed. Import types directly:
 
 ```ts
-import type { IntentLinkProps, PhysicsState, IntentContextType } from "intent-link";
+import type { IntentLinkProps, UseIntentTargetOptions } from "intent-link";
 ```
 
 ## License
 
 MIT
+
+## Contributors
+
+- Uzafir Ahmad Rafaq
+- Muaz Hassan
+- Ali Muzaffar

@@ -1,6 +1,6 @@
 "use client";
 export { default as IntentProvider } from './IntentProvider';
 export { default as IntentLink } from './IntentLink';
-export { default as IntentContext } from './IntentContext';
+export { useIntentTarget } from './useIntentTarget';
 export type { IntentLinkProps } from './IntentLink';
-export type { PhysicsState, IntentContextType } from './IntentContext';
+export type { IntentLevel, UseIntentTargetOptions } from './useIntentTarget';
