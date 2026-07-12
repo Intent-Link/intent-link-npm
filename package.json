@@ -1,6 +1,6 @@
 {
   "name": "intent-link",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "User target prediction library",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
