@@ -188,7 +188,7 @@ export class IntentEngine {
             const dx = isMobile ? 0 : originX - centerX;
             const dy = originY - centerY;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const width = Math.max(Math.min(rect.width, rect.height), 1);
+            const width = Math.max(rect.width, rect.height, 1);
             const agentExponent = -(agentVelocity * agentVelocity)
                 / (2 * velocityVariance);
             const targetExponent = -(targetVelocity * targetVelocity)
