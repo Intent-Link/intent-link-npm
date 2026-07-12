@@ -1,16 +1,17 @@
-name: Publish to npm
+name: Test and publish
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - dev
+      - main
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  publish:
+  test-and-publish:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -22,12 +23,6 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           cache: npm
-
-      - name: Verify tag matches package version
-        run: |
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          test "$PACKAGE_VERSION" = "$TAG_VERSION"
 
       - name: Install dependencies
         run: npm ci
@@ -41,5 +36,20 @@ jobs:
       - name: Verify package contents
         run: npm pack --dry-run
 
+      - name: Check whether this version is already published
+        if: github.ref == 'refs/heads/main'
+        id: npm-version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if npm view "intent-link@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "intent-link@${PACKAGE_VERSION} is already published; skipping npm publish."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "intent-link@${PACKAGE_VERSION} is new and will be published."
+          fi
+
       - name: Publish package
+        if: github.ref == 'refs/heads/main' && steps.npm-version.outputs.publish == 'true'
         run: npm publish
