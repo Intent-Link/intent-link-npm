@@ -29,7 +29,7 @@ export class IntentEngine {
     private targetIds = new WeakMap<Element, string>();
     private visibleTargetIds = new Set<string>();
     private observer: IntersectionObserver | null = null;
-    private cursor = { x: 0, y: 0, active: false };
+    private cursor = { x: 0, y: 0, active: false, seen: false };
     private scroll = { y: 0, active: false };
     private kalman2D = new KalmanFilter2D();
     private kalman1D = new KalmanFilter1D();
@@ -42,6 +42,7 @@ export class IntentEngine {
         if (this.started) return;
         this.started = true;
         this.isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+        this.kalman1D.init(window.scrollY, performance.now());
 
         if (typeof IntersectionObserver !== 'undefined') {
             this.observer = new IntersectionObserver(this.handleIntersections, { threshold: 0 });
@@ -135,7 +136,7 @@ export class IntentEngine {
     };
 
     private handleMouseMove = (event: MouseEvent) => {
-        this.cursor = { x: event.clientX, y: event.clientY, active: true };
+        this.cursor = { x: event.clientX, y: event.clientY, active: true, seen: true };
         if (!this.kalman2D.lastTime) {
             this.kalman2D.init(event.clientX, event.clientY, performance.now());
         }
@@ -158,19 +159,29 @@ export class IntentEngine {
     private runFrame = (timestamp: number) => {
         this.requestId = 0;
         const isMobile = this.isTouchDevice;
-        if ((!isMobile && !this.cursor.active) || (isMobile && !this.scroll.active)) return;
+        if (isMobile && !this.scroll.active) return;
+        if (!isMobile && (!this.cursor.seen || (!this.cursor.active && !this.scroll.active))) return;
 
         let agentVelocity = 0;
         let targetVelocity = 0;
-        let velocityVariance = MIN_VELOCITY_VARIANCE;
+        let agentVelocityVariance = MIN_VELOCITY_VARIANCE;
+        let targetVelocityVariance = MIN_VELOCITY_VARIANCE;
 
-        if (!isMobile) {
+        if (!isMobile && this.cursor.active) {
             const estimate = this.kalman2D.update(this.cursor.x, this.cursor.y, timestamp);
             agentVelocity = estimate.v;
-            velocityVariance = Math.max(estimate.velocityVariance, MIN_VELOCITY_VARIANCE);
-        } else {
+            agentVelocityVariance = Math.max(estimate.velocityVariance, MIN_VELOCITY_VARIANCE);
+        }
+
+        // Scrolling moves every target relative to the agent on both desktop and
+        // mobile. On mobile the agent is stationary (K_a = 1); on desktop the
+        // cursor and target kinetic exponents both contribute to Equation (21).
+        if (this.scroll.active) {
             targetVelocity = Math.abs(this.kalman1D.update(this.scroll.y, timestamp));
-            velocityVariance = Math.max(this.kalman1D.getVelocityVariance(), MIN_VELOCITY_VARIANCE);
+            targetVelocityVariance = Math.max(
+                this.kalman1D.getVelocityVariance(),
+                MIN_VELOCITY_VARIANCE
+            );
         }
 
         const calculated: CalculatedTarget[] = [];
@@ -190,9 +201,9 @@ export class IntentEngine {
             const distance = Math.sqrt(dx * dx + dy * dy);
             const width = Math.max(rect.width, rect.height, 1);
             const agentExponent = -(agentVelocity * agentVelocity)
-                / (2 * velocityVariance);
+                / (2 * agentVelocityVariance);
             const targetExponent = -(targetVelocity * targetVelocity)
-                / (2 * velocityVariance);
+                / (2 * targetVelocityVariance);
             const potentialExponent = -(piE * distance * distance)
                 / (width * width);
             const unnormalizedProbability = Math.exp(agentExponent + targetExponent + potentialExponent);
