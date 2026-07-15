@@ -89,4 +89,24 @@ describe('IntentEngine', () => {
         expect(onIntent).toHaveBeenCalledTimes(1);
         engine.dispose();
     });
+
+    it('penalizes target scroll velocity during desktop cursor interaction', () => {
+        const engine = startEngine();
+        const onIntent = vi.fn();
+        const element = makeTarget();
+        engine.registerTarget('target', element, { importance: 'high', cost: 'low', onIntent });
+        ObserverMock.instance.trigger([element], true);
+
+        const scrollFilter = (engine as unknown as {
+            kalman1D: { update: (position: number, timestamp: number) => number };
+        }).kalman1D;
+        vi.spyOn(scrollFilter, 'update').mockReturnValue(100);
+
+        window.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 100 }));
+        window.dispatchEvent(new Event('scroll'));
+        animationFrame?.(performance.now() + 16);
+
+        expect(onIntent).not.toHaveBeenCalled();
+        engine.dispose();
+    });
 });
